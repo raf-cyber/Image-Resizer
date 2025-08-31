@@ -1,12 +1,4 @@
-import {
-  Sparkles,
-  Zap,
-  Folder,
-  Ruler,
-  ShieldCheck,
-  Globe,
-  Headphones,
-} from "lucide-react";
+import { Sparkles, Zap, Folder, Ruler, ShieldCheck } from "lucide-react";
 
 export default function Services() {
   const services = [

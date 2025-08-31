@@ -5,7 +5,7 @@ export default function Logo() {
     <div className="mb-12">
       <div className="w-20 h-20 rounded-full overflow-hidden shadow-lg">
         <Image
-          src="/images/Logo.jpg"
+          src="/images/favicon.png"
           alt="Naturals Logo"
           width={80}
           height={80}
