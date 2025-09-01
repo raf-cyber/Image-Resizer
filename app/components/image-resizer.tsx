@@ -1,7 +1,7 @@
-// components/image-resizer.tsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Pica from "pica";
 import Button from "./ui/button";
 import UploadArea from "./ui/upload-area";
 
@@ -32,17 +32,35 @@ export default function ImageResizer() {
     setPreviewUrl(objectUrl);
   };
 
-  const resizeImage = async () => {
+  // 🔹 Server-side with Sharp
+  const resizeWithSharp = async (file: File) => {
+    const res = await fetch(
+      `/api/resize-sharp?width=${width}&height=${height}&format=${
+        format.split("/")[1]
+      }`,
+      {
+        method: "POST",
+        body: file,
+      }
+    );
+
+    if (!res.ok) throw new Error("Sharp resize failed");
+
+    const blob = await res.blob();
+    if (resizedUrl) URL.revokeObjectURL(resizedUrl);
+    const url = URL.createObjectURL(blob);
+    setResizedUrl(url);
+  };
+
+  // 🔹 Client-side with Pica
+  const resizeWithPica = async () => {
     if (!previewUrl || !canvasRef.current) return;
 
     const img = new Image();
     img.src = previewUrl;
     await img.decode();
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
+    // calculate aspect ratio
     const aspectRatio = img.width / img.height;
     let newWidth = width * scale;
     let newHeight = height * scale;
@@ -56,29 +74,42 @@ export default function ImageResizer() {
     newWidth = Math.min(newWidth, 2000);
     newHeight = Math.min(newHeight, 2000);
 
+    const canvas = canvasRef.current;
     canvas.width = newWidth;
     canvas.height = newHeight;
 
-    ctx.clearRect(0, 0, newWidth, newHeight);
-    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+    const pica = Pica();
+    await pica.resize(img, canvas, { quality: 3 });
 
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        if (resizedUrl) URL.revokeObjectURL(resizedUrl);
-        const url = URL.createObjectURL(blob);
-        setResizedUrl(url);
-      },
-      format,
-      0.9
-    );
+    const blob = await pica.toBlob(canvas, format, 0.9);
+    if (resizedUrl) URL.revokeObjectURL(resizedUrl);
+    const url = URL.createObjectURL(blob);
+    setResizedUrl(url);
+  };
+
+  // 🔹 Decide based on online/offline
+  const resizeImage = async () => {
+    if (!selectedFile) return;
+
+    try {
+      if (navigator.onLine) {
+        await resizeWithSharp(selectedFile);
+      } else {
+        await resizeWithPica();
+      }
+    } catch (err) {
+      console.error("Resize failed, fallback to Pica:", err);
+      await resizeWithPica();
+    }
   };
 
   const downloadImage = () => {
     if (!resizedUrl || !selectedFile) return;
     const link = document.createElement("a");
     link.href = resizedUrl;
-    link.download = `resized-${selectedFile.name}`;
+    link.download = `resized-${selectedFile.name.split(".")[0]}.${
+      format.split("/")[1]
+    }`;
     link.click();
   };
 
